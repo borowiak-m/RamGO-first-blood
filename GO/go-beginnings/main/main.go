@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"log"
 	"math/rand"
@@ -149,6 +150,7 @@ func main() {
 	divRes, err := getQuotient(5, 0)
 	pl("Divide 5 / 0 :", divRes, "Error :", err)
 	pl("Running total :", getSumOfNums(1, 2, 3, 4, 45))
+	pl("Running total [flattened] :", getSumOfNums(msgCharInts...))
 	pl("Running total :", getSumOfArr(msgCharInts))
 	f3 := 1
 	pl("Before change :", f3)
@@ -163,4 +165,30 @@ func main() {
 	pl("var f3 value from pointer :", *f3poiner)
 	*f3poiner = 111
 	pl("var f3 value from pointer after change:", *f3poiner)
+
+	//break line
+	pl("================Files=============")
+
+	// create txt file if doesn't exist
+	f, err := os.OpenFile("data.txt", os.O_RDWR, 0644)
+	if errors.Is(err, os.ErrNotExist) {
+		f, err := os.Create("data.txt")
+		if err != nil {
+			log.Fatal(err)
+		}
+		defer f.Close()
+	}
+
+	// write to file
+	f.WriteString(message + "\n")
+
+	// read file
+	scan1 := bufio.NewScanner(f)
+	for scan1.Scan() {
+		pl("From txt file :", scan1.Text())
+	}
+	if err := scan1.Err(); err != nil {
+		log.Fatal(err)
+	}
+
 }
