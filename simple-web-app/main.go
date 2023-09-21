@@ -10,8 +10,10 @@ import (
 )
 
 type ToDoList struct {
+	// count number of todos
 	ToDoCount int
-	ToDos     []string
+	// array to hold to dos from a file
+	ToDos []string
 }
 
 func errorCheck(err error) {
@@ -20,11 +22,10 @@ func errorCheck(err error) {
 	}
 }
 
-// write a message and display
+// Pass a string to write a message and display
 func write(writer http.ResponseWriter, msg string) {
 	_, err := writer.Write([]byte(msg))
 	errorCheck(err)
-
 }
 
 func getStrings(fileName string) []string {
