@@ -93,7 +93,7 @@ func returnBook(library *Library, title Title, member *Member) bool {
 	return true
 }
 
-func main() {
+func main_lib() {
 	library := Library{
 		books:   make(map[Title]BookEntry),
 		members: make(map[Name]Member),
