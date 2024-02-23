@@ -29,7 +29,7 @@ func checkout(items []Item) {
 	}
 }
 
-func main() {
+func main_security_tags() {
 	shirt := Item{"Shirt", Active}
 	pants := Item{"Pants", Active}
 	purse := Item{"Purse", Active}
