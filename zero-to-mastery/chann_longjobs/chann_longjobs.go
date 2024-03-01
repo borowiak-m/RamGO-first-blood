@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"math/rand"
+	"sync"
 	"time"
 )
 
@@ -13,10 +14,6 @@ func longCalculation(job Job) int {
 	time.Sleep(duration)
 	fmt.Printf("Job %d complete in %v\n", job, duration)
 	return int(job) * 30
-}
-
-func runJob(resultChan chan int, job Job) {
-	resultChan <- longCalculation(job)
 }
 
 func makeJobs() []Job {
@@ -31,16 +28,23 @@ func main() {
 	rand.New(rand.NewSource(time.Now().UnixNano()))
 	// create a queue of jobs
 	jobs := makeJobs()
-	// create a channel for results
-	resultChan := make(chan int, 10)
-	// load results channel with processed jobs results per iteration
-	for i := 0; i < len(jobs); i++ {
-		// spawn separate processes to handle a job per exec
-		go runJob(resultChan, jobs[i])
-	}
 
 	resultCount := 0
 	sum := 0
+
+	// create a channel for results
+	resultChan := make(chan int, 10)
+	// define a wait group to monitor acive goroutine count
+	var wg sync.WaitGroup
+	// load results channel with processed jobs results per iteration
+	for i := 0; i < len(jobs); i++ {
+		wg.Add(1) // adding one goroutine
+		// spawn separate processes to handle a job per exec
+		go func(resultChan chan int, job Job) {
+			defer wg.Done() // let waiting group know when finished
+			resultChan <- longCalculation(job)
+		}(resultChan, jobs[i])
+	}
 
 	for {
 		// receive processing results from the results channel
@@ -54,5 +58,6 @@ func main() {
 			break
 		}
 	}
+	wg.Wait() // not really needed here since we are looping until all results are read
 	fmt.Println("sum is", sum)
 }
