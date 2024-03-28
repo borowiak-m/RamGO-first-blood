@@ -11,6 +11,7 @@ import (
 	"log"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/google/uuid"
 )
@@ -31,14 +32,50 @@ func makeWork(base64Images ...string) <-chan string {
 	return out
 }
 
-func pipeline[InType any, OutType any](inChan <-chan InType, process func(InType) OutType) <-chan OutType {
+func pipeline[InType any, OutType any](quit <-chan struct{}, inChan <-chan InType, process func(InType) OutType) <-chan OutType {
 	out := make(chan OutType)
 	go func() {
+		defer close(out)
 		for eachIn := range inChan {
-			out <- process(eachIn)
+			select {
+			case out <- process(eachIn):
+			case <-quit:
+				// if quit signal comes in return
+				return
+			}
 		}
+	}()
+	return out
+}
+
+func fanIn[T any](channels ...<-chan T) <-chan T {
+	var wg sync.WaitGroup
+	out := make(chan T)
+	// add to wait group for each channel passed in
+	// each spawned goroutine will correlate to one
+	passedChannelsNum := len(channels)
+	fmt.Println("Passed number of channels:", passedChannelsNum)
+	wg.Add(passedChannelsNum)
+
+	for _, ch := range channels {
+		// spawn a goroutine per channel
+		go func(in <-chan T) {
+			// output all messages from channel
+			for i := range in {
+				// out channel is accessible to all goroutines (closure)
+				out <- i
+			}
+			fmt.Println("One channel is done")
+			wg.Done()
+		}(ch)
+	}
+
+	go func() {
+		wg.Wait()
+		fmt.Println("Closing output channel")
 		close(out)
 	}()
+
 	return out
 }
 
@@ -68,17 +105,37 @@ func saveToDisk(imgBuf bytes.Buffer) string {
 }
 
 func main() {
-
+	// create quit channel
+	quit := make(chan struct{})
+	var quitSignal struct{}
 	// load data into pipeline
 	base64Images := makeWork(rocker_img, pirate_img)
+
+	// STAGE 1
 	// decode base64 into image format
-	rawImages := pipeline(base64Images, base64ToRawImage)
+	rawImages1 := pipeline(quit, base64Images, base64ToRawImage)
+	rawImages2 := pipeline(quit, base64Images, base64ToRawImage)
+	rawImages3 := pipeline(quit, base64Images, base64ToRawImage)
+	rawImages := fanIn(rawImages1, rawImages2, rawImages3)
+
+	// STAGE 2
 	// encode as webp
-	webpImages := pipeline(rawImages, encodeToWebp)
+	webpImages1 := pipeline(quit, rawImages, encodeToWebp)
+	webpImages2 := pipeline(quit, rawImages, encodeToWebp)
+	webpImages3 := pipeline(quit, rawImages, encodeToWebp)
+	webpImages := fanIn(webpImages1, webpImages2, webpImages3)
+
+	quit <- quitSignal
+
+	// STAGE 3
 	// save img
-	filenames := pipeline(webpImages, saveToDisk)
+	filenames1 := pipeline(quit, webpImages, saveToDisk)
+	filenames2 := pipeline(quit, webpImages, saveToDisk)
+	filenames3 := pipeline(quit, webpImages, saveToDisk)
+	filenames := fanIn(filenames1, filenames2, filenames3)
 
 	for name := range filenames {
 		fmt.Println("File name:", name)
 	}
+
 }
